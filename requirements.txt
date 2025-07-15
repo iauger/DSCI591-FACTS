@@ -1,0 +1,12 @@
+google-cloud-storage
+google-cloud-bigquery
+google-cloud-aiplatform
+google-auth
+google-cloud-iam
+google-cloud-core
+google-cloud-exceptions
+python-dotenv
+pandas
+pyarrow
+json
+csv
