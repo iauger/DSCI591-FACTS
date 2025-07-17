@@ -5,6 +5,7 @@ from typing import Optional, Union
 import pandas as pd
 from pathlib import Path
 
+import requests
 from tqdm import tqdm
 
 class DataDownLoader:
@@ -13,7 +14,8 @@ class DataDownLoader:
         self.output_path.mkdir(parents=True, exist_ok=True)
         self.force = force
     
-    def _file_exists(self, path: Path, force: bool) -> bool:
+    @staticmethod
+    def _file_exists(path: Path, force: bool) -> bool:
         if path.exists():
             if force:
                 tqdm.write(f"Overwriting existing file: {path}")
@@ -36,6 +38,31 @@ class DataDownLoader:
         except Exception as e:
             tqdm.write(f"Failed to download {url}: {e}")
             return None
+    
+    def download_and_load_parquet(self, url: str, local_name: str, raw_dir: Path, to_csv: bool = True) -> pd.DataFrame:
+        local_path = raw_dir / local_name
+        try:
+            if not local_path.exists():
+                response = requests.get(url)
+                response.raise_for_status()
+                with open(local_path, "wb") as f:
+                    f.write(response.content)
+                tqdm.write(f"Downloaded Parquet: {local_path}")
+            else:
+                tqdm.write(f"Parquet already cached: {local_path}")
+        except requests.exceptions.RequestException as e:
+            tqdm.write(f"Failed to download Parquet from {url}: {e}")
+            raise
+
+        df = pd.read_parquet(local_path)
+        tqdm.write(f"Loaded {len(df):,} rows from {local_path.name}")
+
+        if to_csv:
+            csv_path = local_path.with_suffix(".csv")
+            df.to_csv(csv_path, index=False)
+            tqdm.write(f"Converted Parquet to CSV: {csv_path}")
+
+        return df
         
     def hugging_face_download(
     self,
@@ -100,64 +127,8 @@ class DataDownLoader:
     def download_csv(self, dataset_name: str, url: str):
         return self.url_download(url, dataset_name + '.csv')
     
-    def normalize_fever_evidence(self, record: dict) -> list[dict]:
-        normalized = []
-        for evidence_group in record.get("evidence", []):
-            for item in evidence_group:
-                if isinstance(item, list) and len(item) == 4:
-                    normalized.append({
-                        "annotation_id": item[0],
-                        "evidence_id": item[1],
-                        "wikipedia_title": item[2],
-                        "sentence_id": item[3]
-                    })
-        return normalized
+    
 
     
-    def convert_json_to_jsonl(self, json_path: Path, jsonl_path: Optional[Path] = None, force: bool = False) -> Optional[Path]:
-        json_path = Path(json_path)
-        if jsonl_path is None: 
-            jsonl_path = json_path.with_suffix('.jsonl')
-        
-        if jsonl_path.exists() and not force:
-            tqdm.write(f"Skipping conversion, file already exists: {jsonl_path}")
-            return jsonl_path
-        
-        try: 
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            if not isinstance(data, list):
-                raise ValueError(f"Expected a list of objects in {json_path}, got {type(data)}")
-
-            with open(jsonl_path, 'w', encoding='utf-8') as f_out:
-                for item in data:
-                    json.dump(item, f_out)
-                    f_out.write('\n')
-            
-            if "fever_dev_train" in json_path.name.lower():
-                item["evidence"] = self.normalize_fever_evidence(item)
-            
-            tqdm.write(f"Converted {json_path} to {jsonl_path}")
-            return jsonl_path
-
-        except Exception as e:
-            tqdm.write(f"Failed to convert {json_path} to JSONL: {e}")
-            return None
     
-    
-    def convert_jsonl_to_csv(self, jsonl_path: str, csv_name: str):
-        csv_path = self.output_path / f"{csv_name}.csv"
-        
-        if self._file_exists(csv_path, self.force):
-            return csv_path
-        
-        try:
-            df = pd.read_json(jsonl_path, lines=True)
-            df.to_csv(csv_path, index=False)
-            tqdm.write(f"Converted {jsonl_path} to {csv_path}")
-            return csv_path
-        except Exception as e:
-            tqdm.write(f"Failed to convert {jsonl_path} to CSV: {e}")
-            return None
         

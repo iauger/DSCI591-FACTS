@@ -16,11 +16,15 @@ def main(force: bool = False, prompt_user: bool = True):
         "fever_dev_train": {"url": "https://fever.ai/download/fever/shared_task_dev.jsonl",
                             "type": "jsonl"},
         "truthful_qa_train": {"url": "https://raw.githubusercontent.com/sylinrl/TruthfulQA/main/TruthfulQA.csv",
-                            "type": "csv"}
+                            "type": "csv"},
+        "squad_v2_train": {"url": "https://huggingface.co/datasets/rajpurkar/squad_v2/resolve/main/squad_v2/train-00000-of-00001.parquet",
+                            "type": "parquet"},
+        "squad_v2_validation": {"url": "https://huggingface.co/datasets/rajpurkar/squad_v2/resolve/main/squad_v2/validation-00000-of-00001.parquet",
+                            "type": "parquet"}
+        
     }
 
     hf_datasets = [
-        {"name": "squad_v2", "split": "train", "format": "csv"},
         {"name": "nq_open", "split": "train", "format": "jsonl"}
     ]
 
@@ -33,42 +37,50 @@ def main(force: bool = False, prompt_user: bool = True):
     else:
         downloader.force = force
 
-    # Download URL datasets
-    print("Downloading datasets from URLs...\n")
+    raw_dir = Path("../data/raw")
+
     for name in tqdm(urls, desc="URL Downloads"):
         info = urls[name]
+        stem = name.lower()
+
+        already_exists = any(
+            (raw_dir / f"{stem}{ext}").exists()
+            for ext in [".json", ".jsonl", ".csv"]
+        )
+
+        if already_exists and not downloader.force:
+            tqdm.write(f"Skipping {name}: cleaned or downloaded file already exists.")
+            continue
+        
         if info["type"] == "json":
             downloader.download_json(name, info["url"])    
         elif info["type"] == "jsonl":
             downloader.url_download(info["url"], f"{name}.jsonl")
         elif info["type"] == "csv":
             downloader.download_csv(name, info["url"])
+        elif info["type"] == "parquet":
+            downloader.download_and_load_parquet(info["url"], f"{name}.parquet", raw_dir, to_csv=True)
 
     # --- Hugging Face Downloads ---
     print("\nDownloading datasets from Hugging Face...\n")
     for config in tqdm(hf_datasets, desc="Hugging Face Downloads"):
+        name = config["name"]
+        split = config.get("split", "train")
+        fmt = config.get("format", "jsonl")
+        ext = ".csv" if fmt == "csv" else ".jsonl"
+        filename_stem = f"{name}_{split}"
+        file_exists = any((raw_dir / f"{filename_stem}{e}").exists() for e in [".csv", ".jsonl", ".json"])
+
+        if file_exists and not downloader.force:
+            tqdm.write(f"Skipping HuggingFace download for {filename_stem}: file already exists.")
+            continue
+
         downloader.hugging_face_download(
-            dataset_name=config["name"],
+            dataset_name=name,
             subset=config.get("subset"),
-            split=config.get("split", "train"),
-            file_format=config.get("format", "jsonl")
+            split=split,
+            file_format=fmt
         )
-    
-    # Convert JSON to JSONL if needed
-    raw_dir = Path("../data/raw")
-    json_files = list(raw_dir.glob("*.json"))
-    
-    if json_files:
-        tqdm.write("\nConverting JSON files to JSONL format...\n")
-        for json_path in tqdm(json_files, desc="Converting JSON to JSONL"):
-            tqdm.write(f"Converting {json_path.name} to JSONL format")
-            jsonl_path = downloader.convert_json_to_jsonl(json_path)
-            
-            if jsonl_path:
-                # Archive the original .json file
-                archive_path = json_path.parent / "archive"
-                archive_path.mkdir(exist_ok=True)
-                json_path.rename(archive_path / json_path.name)
 
 if __name__ == "__main__":
     import argparse
