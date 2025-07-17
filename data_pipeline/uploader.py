@@ -22,6 +22,25 @@ class DataUploader:
         self.project_id = project_id
         self.dataset_name = dataset_name
         self.bucket_name = bucket_name
+        
+        if self.bq_client and self.dataset_name:
+            self._ensure_dataset_exists()
+    
+    def _ensure_dataset_exists(self):
+        if self.dataset_name is None:
+            raise ValueError("dataset_name must not be None.")
+        if self.bq_client is None:
+            raise ValueError("BigQuery client (bq_client) must not be None.")
+        
+        dataset_ref = self.bq_client.dataset(self.dataset_name)
+        
+        try:
+            self.bq_client.get_dataset(dataset_ref)
+        except Exception:
+            dataset = bigquery.Dataset(dataset_ref)
+            dataset.location = "US"
+            self.bq_client.create_dataset(dataset)
+            tqdm.write(f"Created dataset: {self.dataset_name}")
     
     def upload_to_bigquery(self, file_path: Path, table_name: str, write_mode = "WRITE_TRUNCATE") -> bool:
         """
@@ -42,6 +61,7 @@ class DataUploader:
         if file_path.suffix not in ['.csv', '.jsonl']:
             tqdm.write(f"Unsupported file format {file_path.suffix}. Only CSV and JSONL are supported.")
             return False
+        
         
         safe_table_name = table_name.replace("-", "_").replace(".", "_")
 
