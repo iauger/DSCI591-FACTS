@@ -86,7 +86,7 @@ ipython_config.py
 credentials/**/*
 
 # Data Files
-data_ingestion/**/*
+data/**/*
 
 
 # pyenv
