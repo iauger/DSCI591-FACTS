@@ -205,3 +205,5 @@ class DataCleaner:
                     record = self.clean_hotpotqa_record(record)
                 json.dump(record, f_out)
                 f_out.write('\n')
+    
+    
