@@ -85,9 +85,27 @@ ipython_config.py
 # Credentials
 credentials/**/*
 
-# Data Files
-data/**/*
+# --- keep data out of Git by default ---
+data/*
+!data/.gitkeep
 
+# --- allow specific TruthfulQA files in raw/ ---:
+!data/raw/
+data/raw/*
+!data/raw/truthful_qa_train.csv
+
+# --- allow specific TruthfulQA files in clean/ ---
+!data/clean/
+data/clean/*
+!data/clean/truthful_qa_train.csv
+
+# --- Allow processed ---
+!data/processed/
+!data/processed/**
+
+# --- Allow features ---
+!data/features/
+!data/features/**
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
