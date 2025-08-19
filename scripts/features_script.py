@@ -6,6 +6,7 @@ import json
 import argparse
 from typing import List, Any, Dict  
 import pandas as pd
+from tqdm import tqdm
 
 # add project root to sys.path so imports work
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -59,7 +60,7 @@ def main(in_path, out_path, preview_n=None):
         df = df.head(preview_n)
 
     out_rows: List[dict] = []
-    for idx, row in df.iterrows():
+    for idx, row in tqdm(df.iterrows(), total=df.shape[0], desc="Questions"):
         qid = row.get("Question ID", row.get("qid", idx))
         q = row.get("Question", "")
         true_list = list(ast.literal_eval(row.get("Correct Answers", "[]").strip()))
@@ -72,7 +73,7 @@ def main(in_path, out_path, preview_n=None):
             print(f"Skipping empty question {qid}: {q}")
             continue
         
-        for ans in all_answers:
+        for ans in tqdm(all_answers, desc=f"Answers for Q{qid}", leave=False):
             is_true = ans in true_list
             is_best = (ans == best_true) if is_true else (ans == best_false)
 
