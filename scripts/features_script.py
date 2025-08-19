@@ -5,14 +5,12 @@ import os
 import json
 import argparse
 from typing import List, Any, Dict  
-
 import pandas as pd
-
 
 # add project root to sys.path so imports work
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from features.nli_scoring import score_nli
-from features.aggregate_features import compute_features
+from features.aggregate_features import compute_features, aggregate_scores, process_answer
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
@@ -45,6 +43,7 @@ def process_row(qid: int,
         row[f"nli_{label.lower()}"] = score
     
     # NLI: answer → opposite best anchor
+    # TODO: decide on best approach. Everything against Everything or Everything against Best True
     if is_true and best_false:
         for label, score in score_nli(answer, best_false).items():
             row[f"nli_{label.lower()}_vs_best_false"] = score
@@ -65,14 +64,28 @@ def main(in_path, out_path, preview_n=None):
         q = row.get("Question", "")
         true_list = list(ast.literal_eval(row.get("Correct Answers", "[]").strip()))
         false_list = list(ast.literal_eval(row.get("Incorrect Answers", "[]").strip()))
-        best = row.get("Best Answer", "").strip()
-        worst = row.get("Best Incorrect Answer", "").strip()
+        best_true = str(row.get("Best Answer", "")).strip()
+        best_false = str(row.get("Best Incorrect Answer", "")).strip()
+        
+        all_answers = true_list + false_list
+        if not all_answers:
+            print(f"Skipping empty question {qid}: {q}")
+            continue
+        
+        for ans in all_answers:
+            is_true = ans in true_list
+            is_best = (ans == best_true) if is_true else (ans == best_false)
 
-        for ans in true_list:
-            out_rows.append(process_row(int(qid), q, ans, is_true=True, is_best=(ans == best), best_true=best, best_false=worst))
-
-        for ans in false_list:
-            out_rows.append(process_row(int(qid), q, ans, is_true=False, is_best=(ans == worst), best_true=best, best_false=worst))
+            out_rows.append(
+                process_answer(
+                    qid=qid,
+                    question=q,
+                    answer=ans,
+                    all_answers=all_answers,
+                    is_true=is_true,
+                    is_best=is_best
+                )
+            )
 
 
     with open(out_path, "w", encoding="utf-8") as f:
