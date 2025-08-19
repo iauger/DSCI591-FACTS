@@ -2,9 +2,6 @@
 
 import math
 from typing import Dict
-import nltk
-nltk.download('wordnet')
-nltk.download('omw-1.4')   # optional but helps with coverage
 
 from nltk.stem import PorterStemmer
 from nltk.stem import WordNetLemmatizer

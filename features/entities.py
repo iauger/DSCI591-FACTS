@@ -1,13 +1,13 @@
 import re
 import pycountry
 from typing import Dict
-from .readability import split_sentences_as_dict
+from .readability import split_sentences_as_dict, clean_and_tokenize
 
 
 # --- Regex patterns ---
-NUMBER_PATTERN = re.compile(r"\b\d+(\.\d+)?%?\b")
+NUMBER_PATTERN = re.compile(r'\b\d{1,3}(?:,\d{3})*(?:\.\d+)?%?\b')
 YEAR_PATTERN = re.compile(r"\b(19|20)\d{2}\b")
-CURRENCY_PATTERN = re.compile(r"[$€£¥]\d+(\.\d+)?")
+CURRENCY_PATTERN = re.compile(r'[$€£¥]\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?')
 
 # --- Geographic terms ---
 regions = [
@@ -47,10 +47,14 @@ def compute_entities_features(answer_text: str) -> Dict[str, float]:
     
     # Capitalized words
     # Skips first word in sentence, just trying to ID proper nouns
-    cap_count = sum(
-        1 for i, t in enumerate(tokens)
-        if t and t[0].isupper() and i != 0
-    )
+    cap_count = 0
+    for s in sent_dict.values():
+        raw_tokens = clean_and_tokenize(s["raw"])
+        for i, tok in enumerate(raw_tokens):
+            if i == 0:  # skip first token in sentence
+                continue
+            if tok[:1].isupper():
+                cap_count += 1
 
     entity_total = num_count + year_count + currency_count + geo_count + cap_count
     entity_ratio = entity_total / token_count if token_count > 0 else 0.0
