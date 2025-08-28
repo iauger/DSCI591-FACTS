@@ -18,8 +18,38 @@ regions = [
     "british isles", "gulf region"
 ]
 
+us_states = [
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut",
+    "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
+    "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan",
+    "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire",
+    "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio",
+    "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota",
+    "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia",
+    "wisconsin", "wyoming"
+]
+
 country_names = [country.name.lower() for country in pycountry.countries] # type: ignore
-geo_terms = set(regions + country_names)
+geo_terms = set(regions + country_names + us_states)
+
+def count_geo_terms(tokens: list[str], geo_terms: set[str]) -> int:
+    used = set()
+    count = 0
+    for n in (3, 2, 1):  # check trigrams, bigrams, unigrams in that order
+        i = 0
+        while i <= len(tokens) - n:
+            span_idx = tuple(range(i, i+n))
+            if any(j in used for j in span_idx):
+                i += 1
+                continue
+            ngram = " ".join(tokens[i:i+n])
+            if ngram in geo_terms:
+                count += 1
+                used.update(span_idx)
+                i += n
+            else:
+                i += 1
+    return count
 
 def compute_entities_features(answer_text: str) -> Dict[str, float]:
     text = (answer_text or "").strip()
@@ -43,15 +73,15 @@ def compute_entities_features(answer_text: str) -> Dict[str, float]:
     currency_count = len(CURRENCY_PATTERN.findall(text))    
     
     # Geographic matches
-    geo_count = sum(1 for tok in tokens if tok in geo_terms)    
+    geo_count = count_geo_terms(tokens, geo_terms)   
     
     # Capitalized words
     # Skips first word in sentence, just trying to ID proper nouns
     cap_count = 0
-    for s in sent_dict.values():
-        raw_tokens = clean_and_tokenize(s["raw"])
+    for s in split_sentences_as_dict(text, make_lower=False).values():
+        raw_tokens = clean_and_tokenize(s["raw"], make_lower=False)
         for i, tok in enumerate(raw_tokens):
-            if i == 0:  # skip first token in sentence
+            if i == 0:
                 continue
             if tok[:1].isupper():
                 cap_count += 1
