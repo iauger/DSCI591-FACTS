@@ -22,3 +22,10 @@ def score_nli(question: str, answer: str) -> dict[str, float]:
 
     scores = {item["label"]: float(item["score"]) for item in outputs if isinstance(item, dict)}
     return scores
+
+def score_answer_vs_bta(bta_text: str, cand_answer: str) -> dict[str, float]:
+    """
+    Score candidate answer vs. best truthful answer (BTA) using NLI model.
+    Returns dict with keys: "ENTAILMENT", "NEUTRAL", "CONTRADICTION"
+    """
+    return score_nli(bta_text, cand_answer)

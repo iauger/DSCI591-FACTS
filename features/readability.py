@@ -12,15 +12,17 @@ WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*")
 TERMINATORS = [".", "!", "?"]
 LINE_BREAKS = ["\n", "\r"]
 
-def clean_and_tokenize(sentence: str) -> list[str]:
+def clean_and_tokenize(sentence: str, make_lower: bool = True) -> list[str]:
     WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*")
 
     # Remove special characters and tokenize
-    sentence = sentence.lower().strip()
+    sentence = sentence.strip()
+    if make_lower:
+        sentence = sentence.lower()
     words = WORD_RE.findall(sentence)
     return words
 
-def split_sentences_as_dict(text: str) -> Dict[int, Dict[str, Any]]:
+def split_sentences_as_dict(text: str, make_lower: bool = True) -> Dict[int, Dict[str, Any]]:
     """
     Split text into sentences and return a dict with raw text and cleaned tokens.
     Example:
@@ -36,14 +38,14 @@ def split_sentences_as_dict(text: str) -> Dict[int, Dict[str, Any]]:
         return {}
 
     if not any(p in text for p in TERMINATORS):
-        return {0: {"raw": text, "tokens": clean_and_tokenize(text)}}
+        return {0: {"raw": text, "tokens": clean_and_tokenize(text, make_lower=make_lower)}}
 
     pattern = "[" + re.escape("".join(TERMINATORS)) + "]"
     parts = re.split(pattern, text)
     parts = [p.strip() for p in parts if p.strip()]
 
     return {
-        i: {"raw": s, "tokens": clean_and_tokenize(s)}
+        i: {"raw": s, "tokens": clean_and_tokenize(s, make_lower=make_lower)}
         for i, s in enumerate(parts)
     }
 

@@ -1,8 +1,9 @@
 # aggregate_features.py
 from typing import Dict, Iterable, Optional, List, Any
 from statistics import mean, stdev
+import math
 from . import ALL_EXTRACTORS
-from .nli_scoring import score_nli
+from .nli_scoring import score_nli, score_answer_vs_bta
 
 def compute_features(
     text: str,
@@ -53,6 +54,7 @@ def process_answer(qid: int,
     *,
     is_true: bool,
     is_best: bool,
+    bta_text: Optional[str] = None,
 ) -> Dict[str, Any]:
 
     """
@@ -73,6 +75,11 @@ def process_answer(qid: int,
         "group_answer_count": float(len(all_answers)),
     }
     
+    # Ensure stable schema even without BTA present
+    row["nli_entailment_vs_best_true"]    = math.nan
+    row["nli_neutral_vs_best_true"]       = math.nan
+    row["nli_contradiction_vs_best_true"] = math.nan
+
     row.update(feats)
     # flatten basic text features
     for k, v in feats.items():
@@ -88,6 +95,19 @@ def process_answer(qid: int,
         if other.strip() == answer.strip():
             continue
         pair_scores.append(score_nli(answer, other))
+    
+    # NLI answer:BTA (answer against BTA if available)
+    if bta_text: 
+        bta_scores = score_answer_vs_bta(bta_text, answer)
+        
+        for label, prob in bta_scores.items():
+            key = label.strip().lower()
+            if key == "entailment":
+                row["nli_entailment_vs_best_true"] = float(prob)
+            elif key == "neutral":
+                row["nli_neutral_vs_best_true"] = float(prob)
+            elif key == "contradiction":
+                row["nli_contradiction_vs_best_true"] = float(prob)
 
     # aggregate pairwise results
     agg = aggregate_scores(pair_scores)
