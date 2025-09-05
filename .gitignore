@@ -88,6 +88,7 @@ credentials/**/*
 # --- keep data out of Git by default ---
 data/*
 !data/.gitkeep
+credentials/*
 
 # --- allow specific TruthfulQA files in raw/ ---:
 !data/raw/
