@@ -89,6 +89,8 @@ credentials/**/*
 data/*
 !data/.gitkeep
 credentials/*
+!credentials/.gitkeep
+
 
 # --- allow specific TruthfulQA files in raw/ ---:
 !data/raw/

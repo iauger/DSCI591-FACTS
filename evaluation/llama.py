@@ -1,14 +1,25 @@
 import os
 import pandas as pd
 import replicate
-from datasets import load_dataset
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Explicitly load your secrets file
+load_dotenv(dotenv_path=Path("credentials/secrets.env"))
+
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+if not REPLICATE_API_TOKEN:
+    raise RuntimeError(
+        "Missing REPLICATE_API_TOKEN. "
+        "Set it in credentials/secrets.env and keep secrets out of source control."
+    )
 
 # --- 1. SETUP ---
 # The script will automatically use the REPLICATE_API_TOKEN environment variable.
 # Ensure it is set before running.
 #TODO: setup .env token access
-my_token = "token goes here"
-client = replicate.Client(api_token = my_token)
+my_token = REPLICATE_API_TOKEN
+os.environ["REPLICATE_API_TOKEN"] = my_token  # Ensure the token is set for replicate.run
 
 
 # --- 1. SETUP ---
@@ -27,10 +38,18 @@ temperatures = [0.1, 0.4, 0.7, 1.0, 1.3]
 LLAMA_2_70B_CHAT = "meta/llama-2-70b-chat"
 
 # --- 3. LOAD DATASET & PREPARE FOR RESUMING ---
-print("Loading TruthfulQA dataset...")
-dataset = load_dataset("truthful_qa", "generation")
-# Convert to a list for easier indexing.
-questions = list(dataset['validation']['question'])
+print("Loading TruthfulQA cleaned dataset...")
+
+DATA_PATH = os.path.join("data", "clean", "truthful_qa_train.csv")
+df = pd.read_csv(DATA_PATH)
+
+# Make sure the column name matches your CSV (likely "question")
+if "question" not in df.columns:
+    raise ValueError(f"'question' column not found in {DATA_PATH}. Found columns: {df.columns.tolist()}")
+
+df["qid"] = df.index  # or use a pre-existing ID column if available
+questions = df[["qid", "question"]].values.tolist()
+
 print(f"Dataset loaded. Found {len(questions)} questions.")
 
 processed_pairs = set()
@@ -68,7 +87,7 @@ new_results_count = 0
 
 # Loop through the questions list, starting from the last processed question.
 for i in range(start_index, len(questions)):
-    question = questions[i]
+    qid, question = questions[i]
     for temp in temperatures:
         # Check if this specific question and temperature combination has already been processed.
         if (question, temp) in processed_pairs:
@@ -87,8 +106,8 @@ for i in range(start_index, len(questions)):
                 f"{question} [/INST]"
             )
 
-            # Call the Replicate API using the simpler replicate.run() function.
-            output = client.run(
+            # Call the Replicate API using the replicate.run() function.
+            output = replicate.run(
                 LLAMA_2_70B_CHAT,
                 input={
                     "prompt": prompt_template,
@@ -102,6 +121,7 @@ for i in range(start_index, len(questions)):
 
             # Prepare the new result for saving.
             new_result = {
+                "QID": [qid],
                 "Question": [question],
                 "Temperature": [temp],
                 "Answer": [full_response]
@@ -124,6 +144,7 @@ for i in range(start_index, len(questions)):
         except Exception as e:
             print(f"An error occurred with question '{question}' at temp {temp}: {e}")
             error_result = {
+                "QID": [qid],
                 "Question": [question],
                 "Temperature": [temp],
                 "Answer": [f"API_ERROR: {e}"]
