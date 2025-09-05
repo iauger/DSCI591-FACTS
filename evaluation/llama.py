@@ -6,7 +6,8 @@ from datasets import load_dataset
 # --- 1. SETUP ---
 # The script will automatically use the REPLICATE_API_TOKEN environment variable.
 # Ensure it is set before running.
-my_token = "r8_WPgKuCVbvxoeTEDk4yPklLUJTrrGi5D2zLTcK"
+#TODO: setup .env token access
+my_token = "token goes here"
 client = replicate.Client(api_token = my_token)
 
 
